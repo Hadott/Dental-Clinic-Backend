@@ -44,3 +44,21 @@ class ReservaCreateSerializer(serializers.ModelSerializer):
 
             from rest_framework import serializers as drf_serializers
             raise drf_serializers.ValidationError({'detail': 'El slot está lleno y no se permiten sobrecupos adicionales.'})
+
+
+class DentistaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Dentista
+        fields = ('id', 'nombre', 'apellido', 'especialidad', 'email', 'telefono', 'max_overbook_day')
+
+
+class ServicioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Servicio
+        fields = ('id', 'nombre', 'duracion_min', 'precio')
+
+
+class PacienteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Paciente
+        fields = ('id', 'nombre', 'apellido', 'telefono', 'email', 'fecha_registro')

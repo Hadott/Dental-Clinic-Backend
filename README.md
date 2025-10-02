@@ -29,16 +29,10 @@ Puntos importantes de comportamiento
   - Si slot.capacidad no está lleno → crear reserva normal (sobrecupo=False).
   - Si está lleno → se permite sobrecupo solo si:
     - slot.max_overbook > sobrecupos_actuales_slot
-    - y dentista.max_overbook_day no se excede para ese día
-  - Si no se cumple, responde 400 con mensaje informativo.
-
-Cómo ejecutar (Windows PowerShell)
 ---------------------------------
 1. Activar entorno virtual (si existe):
-
 ```powershell
 # Si tu venv está en ./venv
-& "C:/Users/Pedro/Documents/Dental Clinic- Backend/venv/Scripts/Activate.ps1"
 # o ejecutar python desde venv como:
 & "C:/Users/Pedro/Documents/Dental Clinic- Backend/venv/Scripts/python.exe" -m pip install -r requirements.txt
 ```
@@ -50,8 +44,6 @@ Cómo ejecutar (Windows PowerShell)
 ```
 
 3. Migraciones y servidor:
-
-```powershell
 & "C:/Users/Pedro/Documents/Dental Clinic- Backend/venv/Scripts/python.exe" manage.py makemigrations
 & "C:/Users/Pedro/Documents/Dental Clinic- Backend/venv/Scripts/python.exe" manage.py migrate
 & "C:/Users/Pedro/Documents/Dental Clinic- Backend/venv/Scripts/python.exe" manage.py runserver
@@ -77,9 +69,6 @@ Endpoints clave (abrir en el navegador)
   - /api/pacientes/   (GET, POST)
   - /api/citas/       (GET, POST)
   - /api/dentistas/   (GET, POST)
-  - /api/agendas/     (GET, POST)  (si aplica)
-
-Ejemplos de uso (PowerShell / curl)
 -----------------------------------
 - Generar slots (POST) usando PowerShell (Invoke-RestMethod):
 
