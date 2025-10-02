@@ -31,6 +31,17 @@ class ReservaCreateSerializer(serializers.ModelSerializer):
             if reservas_actuales < slot.capacidad:
                 reserva = Reserva.objects.create(slot=slot, paciente=paciente, servicio=servicio, sobrecupo=False)
                 return reserva
-            else:
-                from rest_framework import serializers as drf_serializers
-                raise drf_serializers.ValidationError({'detail': 'El slot está lleno, no se permiten más reservas.'})
+
+            # verificar sobrecupos permitidos por slot
+            sobrecupos_actuales_slot = slot.reservas.filter(sobrecupo=True).count()
+            if sobrecupos_actuales_slot < slot.max_overbook:
+                # verificar límite diario del dentista
+                fecha = slot.fecha
+                dentista = slot.dentista
+                sobrecupos_dia = Reserva.objects.filter(slot__dentista=dentista, slot__fecha=fecha, sobrecupo=True).count()
+                if sobrecupos_dia < dentista.max_overbook_day:
+                    reserva = Reserva.objects.create(slot=slot, paciente=paciente, servicio=servicio, sobrecupo=True)
+                    return reserva
+
+            from rest_framework import serializers as drf_serializers
+            raise drf_serializers.ValidationError({'detail': 'El slot está lleno y no se permiten sobrecupos adicionales.'})
