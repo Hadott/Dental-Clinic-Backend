@@ -3,7 +3,8 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from .models import SlotAgenda, Paciente, Dentista, Servicio
 from django.utils import timezone
-from datetime import time, date
+from datetime import time
+
 
 class ReservaCapacityTest(TestCase):
     def setUp(self):
@@ -17,9 +18,20 @@ class ReservaCapacityTest(TestCase):
     def test_two_reservations_second_rejected(self):
         url = reverse('crear-reserva')
         payload = {'slot': self.slot.id, 'paciente': self.paciente.id, 'servicio': self.servicio.id}
-        # primera reserva -> 201
         r1 = self.client.post(url, payload, format='json')
         self.assertEqual(r1.status_code, 201)
-        # segunda reserva -> 400
         r2 = self.client.post(url, payload, format='json')
         self.assertEqual(r2.status_code, 400)
+
+
+class GenerateSlotsTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.dentista = Dentista.objects.create(nombre='Carlos', apellido='Ruiz')
+
+    def test_generate_slots_endpoint(self):
+        url = reverse('generar-slots', kwargs={'dentista_id': self.dentista.id})
+        payload = {'fecha': timezone.localdate().isoformat(), 'desde': '08:00', 'hasta': '10:00'}
+        r = self.client.post(url, payload, format='json')
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue('created' in r.data)

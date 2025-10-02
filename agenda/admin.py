@@ -10,6 +10,7 @@ class PacienteAdmin(admin.ModelAdmin):
 class DentistaAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'apellido', 'especialidad', 'email')
     search_fields = ('nombre', 'apellido', 'especialidad')
+    list_editable = ('especialidad',)
 
 @admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
@@ -19,8 +20,10 @@ class ServicioAdmin(admin.ModelAdmin):
 class SlotAgendaAdmin(admin.ModelAdmin):
     list_display = ('dentista', 'fecha', 'hora', 'capacidad')
     list_filter = ('dentista', 'fecha')
+    list_editable = ('capacidad',)
 
 @admin.register(Reserva)
 class ReservaAdmin(admin.ModelAdmin):
     list_display = ('paciente', 'slot', 'servicio', 'creado_en', 'sobrecupo')
     list_filter = ('sobrecupo', 'slot__dentista')
+    list_editable = ('sobrecupo',)

@@ -3,29 +3,38 @@ from django.utils import timezone
 
 
 class Paciente(models.Model):
+    """Paciente: datos básicos. Muchas clínicas usan nombre/apellido/telefono/email."""
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     telefono = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['apellido', 'nombre']
+
     def __str__(self):
         return f"{self.nombre} {self.apellido}"
 
 
 class Dentista(models.Model):
+    """Dentista: incluye `max_overbook_day` que es común en clínicas para controlar overbooking."""
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
-    especialidad = models.CharField(max_length=100)
+    especialidad = models.CharField(max_length=100, blank=True)
     email = models.EmailField(blank=True)
     telefono = models.CharField(max_length=20, blank=True)
     max_overbook_day = models.PositiveIntegerField(default=0, help_text='Máximo de sobrecupos permitidos por día para este dentista')
+
+    class Meta:
+        ordering = ['apellido', 'nombre']
 
     def __str__(self):
         return f"{self.nombre} {self.apellido} - {self.especialidad}"
 
 
 class Servicio(models.Model):
+    """Servicio ofrecido (limpieza, extracción, etc.). Duración en minutos."""
     nombre = models.CharField(max_length=150)
     duracion_min = models.PositiveIntegerField(help_text='Duración en minutos')
     precio = models.DecimalField(max_digits=8, decimal_places=2)
@@ -35,6 +44,12 @@ class Servicio(models.Model):
 
 
 class SlotAgenda(models.Model):
+    """Slot de una duración estándar (30 min). Muchas clínicas usan slots fijos.
+
+    Campos:
+    - capacidad: cuántos pacientes caben normalmente (1 por defecto)
+    - max_overbook: cuántos sobrecupos admite este slot (0 por defecto)
+    """
     dentista = models.ForeignKey(Dentista, on_delete=models.CASCADE, related_name='slots')
     servicio = models.ForeignKey(Servicio, on_delete=models.SET_NULL, null=True, blank=True)
     fecha = models.DateField()
@@ -45,39 +60,37 @@ class SlotAgenda(models.Model):
 
     class Meta:
         unique_together = ('dentista', 'fecha', 'hora')
+        ordering = ('fecha', 'hora')
 
     def __str__(self):
         return f"{self.dentista} - {self.fecha} {self.hora}"
 
     def clean(self):
-        # Validaciones adicionales: un único slot por dentista/fecha/hora y hora dentro del rango 08:00-16:00
+        # Validaciones: 08:00-16:00 y bloques de 30 minutos
         from django.core.exceptions import ValidationError
         import datetime
 
-        # comprobar rango horario
         min_hora = datetime.time(8, 0)
         max_hora = datetime.time(16, 0)
         if self.hora < min_hora or self.hora > max_hora:
             raise ValidationError({'hora': 'La hora debe estar entre 08:00 y 16:00.'})
 
-        # comprobar duplicados manualmente (para dar error amigable antes de DB)
+        if self.hora.minute not in (0, 30):
+            raise ValidationError({'hora': 'La hora debe estar en bloques de 30 minutos (mm = 00 o 30).'})
+
         qs = SlotAgenda.objects.filter(dentista=self.dentista, fecha=self.fecha, hora=self.hora)
         if self.pk:
             qs = qs.exclude(pk=self.pk)
         if qs.exists():
             raise ValidationError('Ya existe un slot para este dentista en la misma fecha y hora.')
 
-        # comprobar bloques de 30 minutos (mm == 0 o 30)
-        if self.hora.minute not in (0, 30):
-            raise ValidationError({'hora': 'La hora debe estar en bloques de 30 minutos (mm = 00 o 30).'})
-
     def save(self, *args, **kwargs):
-        # ejecutar validación completa antes de guardar (admin y APIs respetarán esto)
         self.full_clean()
         return super().save(*args, **kwargs)
 
 
 class Reserva(models.Model):
+    """Reserva asociada a un `SlotAgenda` y a un `Paciente`. Campo `sobrecupo` indica si fue overbook."""
     slot = models.ForeignKey(SlotAgenda, on_delete=models.CASCADE, related_name='reservas')
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name='reservas')
     servicio = models.ForeignKey(Servicio, on_delete=models.SET_NULL, null=True, blank=True)

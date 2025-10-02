@@ -76,3 +76,24 @@ def generar_slots(request, dentista_id):
         created = generate_slots_for_day(dentista, fecha_obj, desde=desde, hasta=hasta)
 
     return Response({'created': created}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+def slots_por_fecha(request):
+    """Endpoint adicional útil: filtrar por fecha y opcionalmente por dentista.
+    Query params: fecha=YYYY-MM-DD, dentista_id=1
+    """
+    import datetime
+    fecha = request.GET.get('fecha')
+    dentista_id = request.GET.get('dentista_id')
+    qs = SlotAgenda.objects.all()
+    if fecha:
+        try:
+            fecha_obj = datetime.datetime.strptime(fecha, '%Y-%m-%d').date()
+            qs = qs.filter(fecha=fecha_obj)
+        except Exception:
+            return Response({'detail': 'Formato de fecha inválido. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+    if dentista_id:
+        qs = qs.filter(dentista_id=dentista_id)
+    serializer = SlotAgendaSerializer(qs.order_by('hora'), many=True)
+    return Response(serializer.data)
