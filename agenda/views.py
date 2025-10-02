@@ -1,13 +1,16 @@
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework import status
-from .models import SlotAgenda, Reserva
+from .models import SlotAgenda, Reserva, Dentista
 from .serializers import SlotAgendaSerializer, ReservaCreateSerializer
 from django.utils import timezone
-from .models import Dentista
 from rest_framework.decorators import api_view
 from rest_framework import status
 from rest_framework.response import Response
+
+# Reutilizamos la lógica de generación para permitir que la misma lógica sea llamada
+# desde la vista y desde un comando management.
+from .slots_generator import generate_slots_for_day, generate_slots_range
 
 
 class SlotsDisponiblesList(generics.ListAPIView):
@@ -31,8 +34,12 @@ class CrearReserva(generics.CreateAPIView):
 
 @api_view(['POST'])
 def generar_slots(request, dentista_id):
-    """Genera slots de 30 minutos para un dentista en una fecha dada.
-    body: {"fecha": "YYYY-MM-DD", "desde": "08:00", "hasta": "16:00"}
+    """Genera slots usando la lógica centralizada en `slots_generator`.
+    body:
+      - fecha: YYYY-MM-DD (requerido)
+      - desde: HH:MM (opcional, default 08:00)
+      - hasta: HH:MM (opcional, default 16:00)
+      - dias: int (opcional). Si se especifica, genera ese número de días empezando en `fecha`.
     """
     import datetime
     try:
@@ -43,22 +50,29 @@ def generar_slots(request, dentista_id):
     fecha = request.data.get('fecha')
     desde = request.data.get('desde', '08:00')
     hasta = request.data.get('hasta', '16:00')
+    dias = request.data.get('dias')
+
     if not fecha:
         return Response({'detail': 'Se requiere campo fecha (YYYY-MM-DD).'}, status=status.HTTP_400_BAD_REQUEST)
 
-    fecha_obj = datetime.datetime.strptime(fecha, '%Y-%m-%d').date()
-    t_desde = datetime.datetime.strptime(desde, '%H:%M').time()
-    t_hasta = datetime.datetime.strptime(hasta, '%H:%M').time()
+    try:
+        fecha_obj = datetime.datetime.strptime(fecha, '%Y-%m-%d').date()
+    except Exception:
+        return Response({'detail': 'Formato de fecha inválido. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # generar slots de 30 minutos
-    current = datetime.datetime.combine(fecha_obj, t_desde)
-    end = datetime.datetime.combine(fecha_obj, t_hasta)
-    created = 0
-    while current <= end:
-        hora = current.time()
-        # crear slot si no existe
-        SlotAgenda.objects.get_or_create(dentista=dentista, fecha=fecha_obj, hora=hora, defaults={'capacidad': 1})
-        created += 1
-        current += datetime.timedelta(minutes=30)
+    try:
+        if dias:
+            dias = int(dias)
+        else:
+            dias = 1
+    except Exception:
+        return Response({'detail': 'El campo dias debe ser un entero.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # si dias > 1 usamos generate_slots_range
+    if dias > 1:
+        end_date = fecha_obj + datetime.timedelta(days=dias - 1)
+        created = generate_slots_range(dentista, fecha_obj, end_date, desde=desde, hasta=hasta)
+    else:
+        created = generate_slots_for_day(dentista, fecha_obj, desde=desde, hasta=hasta)
 
     return Response({'created': created}, status=status.HTTP_201_CREATED)
