@@ -70,25 +70,7 @@ Endpoints clave (abrir en el navegador)
   - /api/citas/       (GET, POST)
   - /api/dentistas/   (GET, POST)
 -----------------------------------
-- Generar slots (POST) usando PowerShell (Invoke-RestMethod):
 
-```powershell
-$body = @{ fecha = '2025-10-02'; desde = '08:00'; hasta = '16:00' } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/agenda/dentistas/1/generar_slots/ -Body $body -ContentType 'application/json'
-```
-
-- Crear reserva (PowerShell):
-
-```powershell
-$body = @{ slot = 1; paciente = 1; servicio = 1 } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/agenda/reservas/ -Body $body -ContentType 'application/json'
-```
-
-- Crear reserva (curl):
-
-```powershell
-curl --header "Content-Type: application/json" --request POST --data '{"slot":1,"paciente":1,"servicio":1}' http://127.0.0.1:8000/agenda/reservas/
-```
 
 Respuestas esperadas al crear reservas
 -------------------------------------
@@ -123,17 +105,4 @@ Archivos importantes para consultar
 - `agenda/views.py` — vistas para listar slots, crear reservas y generar slots
 - `agenda/urls.py` — rutas públicas de la app
 - `agenda/tests.py` — tests de capacidad de reservas
-
-Siguientes pasos recomendados
-----------------------------
-- Añadir autenticación/permiso para las APIs de creación (actualmente no hay protección).
-- Añadir endpoint admin para forzar sobrecupo por staff si lo deseas.
-- Agregar tests adicionales: validaciones de slots, límites de sobrecupo, y pruebas concurrency.
-
-Contacto
---------
-Si quieres, puedo:
-- Añadir ejemplos de fetch()/axios para tu frontend.
-- Implementar endpoint admin para forzar sobrecupo.
-- Añadir tests automáticos adicionales.
 

@@ -3,7 +3,7 @@ from django.utils import timezone
 
 
 class Paciente(models.Model):
-    """Paciente: datos básicos. Muchas clínicas usan nombre/apellido/telefono/email."""
+  
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     telefono = models.CharField(max_length=20, blank=True)
@@ -18,7 +18,7 @@ class Paciente(models.Model):
 
 
 class Dentista(models.Model):
-    """Dentista: incluye `max_overbook_day` que es común en clínicas para controlar overbooking."""
+   
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     especialidad = models.CharField(max_length=100, blank=True)
@@ -44,7 +44,7 @@ class Servicio(models.Model):
 
 
 class SlotAgenda(models.Model):
-    """Slot de una duración estándar (30 min). Muchas clínicas usan slots fijos.
+    """Slot de una duración estándar (30 min). 
 
     Campos:
     - capacidad: cuántos pacientes caben normalmente (1 por defecto)
