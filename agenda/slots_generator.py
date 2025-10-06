@@ -1,7 +1,7 @@
 """Generación de slots: implementa la práctica común de clínicas:
 
 - Slots de 30 minutos
-- Horario por defecto 08:00-16:00
+- Horario por defecto 08:00-18:00 (extendido para mayor flexibilidad)
 - Evita duplicados usando get_or_create
 """
 import datetime
@@ -14,7 +14,7 @@ def _parse_time(t):
     return datetime.datetime.strptime(t, '%H:%M').time()
 
 
-def generate_slots_for_day(dentista, fecha, desde='08:00', hasta='16:00', capacidad_default=1):
+def generate_slots_for_day(dentista, fecha, desde='08:00', hasta='18:00', capacidad_default=1):
     t_desde = _parse_time(desde)
     t_hasta = _parse_time(hasta)
     current = datetime.datetime.combine(fecha, t_desde)
@@ -34,7 +34,7 @@ def generate_slots_for_day(dentista, fecha, desde='08:00', hasta='16:00', capaci
     return created
 
 
-def generate_slots_range(dentista, start_date, end_date, desde='08:00', hasta='16:00', capacidad_default=1):
+def generate_slots_range(dentista, start_date, end_date, desde='08:00', hasta='18:00', capacidad_default=1):
     total = 0
     day = start_date
     while day <= end_date:

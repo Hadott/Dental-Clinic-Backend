@@ -2,8 +2,21 @@ from django.db import models
 from django.utils import timezone
 
 
+class Region(models.Model):
+    """Regiones donde la clínica tiene presencia"""
+    nombre = models.CharField(max_length=100)
+    codigo = models.CharField(max_length=10, unique=True)
+    
+    class Meta:
+        ordering = ['nombre']
+    
+    def __str__(self):
+        return self.nombre
+
+
 class Paciente(models.Model):
   
+    rut = models.CharField(max_length=15, unique=True, help_text='RUT del paciente (ej: 12.345.678-9)')
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     telefono = models.CharField(max_length=20, blank=True)
@@ -24,6 +37,7 @@ class Dentista(models.Model):
     especialidad = models.CharField(max_length=100, blank=True)
     email = models.EmailField(blank=True)
     telefono = models.CharField(max_length=20, blank=True)
+    region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='dentistas', null=True, blank=True)
     max_overbook_day = models.PositiveIntegerField(default=0, help_text='Máximo de sobrecupos permitidos por día para este dentista')
 
     class Meta:
@@ -71,9 +85,9 @@ class SlotAgenda(models.Model):
         import datetime
 
         min_hora = datetime.time(8, 0)
-        max_hora = datetime.time(16, 0)
+        max_hora = datetime.time(18, 0)  # Extendido hasta las 18:00 para mayor flexibilidad
         if self.hora < min_hora or self.hora > max_hora:
-            raise ValidationError({'hora': 'La hora debe estar entre 08:00 y 16:00.'})
+            raise ValidationError({'hora': 'La hora debe estar entre 08:00 y 18:00.'})
 
         if self.hora.minute not in (0, 30):
             raise ValidationError({'hora': 'La hora debe estar en bloques de 30 minutos (mm = 00 o 30).'})
