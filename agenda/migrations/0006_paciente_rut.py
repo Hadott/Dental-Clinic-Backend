@@ -13,6 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='paciente',
             name='rut',
-            field=models.CharField(blank=True, help_text='RUT del paciente (ej: 12.345.678-9)', max_length=15, null=True, unique=True),
+            field=models.CharField(blank=True, help_text='RUT del paciente (ej: 12.345.678-9)', 
+                                   max_length=15, null=True, unique=False),
         ),
     ]
