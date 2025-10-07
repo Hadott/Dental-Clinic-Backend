@@ -172,6 +172,18 @@ class PacienteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Paciente
         fields = ('id', 'rut', 'nombre', 'apellido', 'telefono', 'email', 'fecha_registro')
+    
+    def validate_rut(self, value):
+        """Validar formato básico del RUT (permite duplicados)"""
+        if not value:
+            raise serializers.ValidationError("El RUT es requerido")
+        return value.strip().upper()
+    
+    def validate_email(self, value):
+        """Validar email pero permitir duplicados si es necesario"""
+        if value:
+            return value.lower().strip()
+        return value
 
 
 class ReservaReadSerializer(serializers.ModelSerializer):

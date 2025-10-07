@@ -1,12 +1,13 @@
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework import status
-from .models import SlotAgenda, Reserva, Dentista
-from .serializers import SlotAgendaSerializer, ReservaCreateSerializer
+from .models import SlotAgenda, Reserva, Dentista, Paciente
+from .serializers import SlotAgendaSerializer, ReservaCreateSerializer, PacienteSerializer
 from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework import status
 from rest_framework.response import Response
+from django.db import transaction
 
 # Reutilizamos la lógica de generación para permitir que la misma lógica sea llamada
 # desde la vista y desde un comando management.
@@ -97,3 +98,101 @@ def slots_por_fecha(request):
         qs = qs.filter(dentista_id=dentista_id)
     serializer = SlotAgendaSerializer(qs.order_by('hora'), many=True)
     return Response(serializer.data)
+
+
+@api_view(['POST'])
+def bulk_create_pacientes(request):
+    """
+    Endpoint para crear múltiples pacientes desde sistemas externos
+    Acepta una lista de pacientes y los crea en lote
+    """
+    if not isinstance(request.data, list):
+        return Response(
+            {'error': 'Se espera una lista de pacientes'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    created_pacientes = []
+    errors = []
+    
+    with transaction.atomic():
+        for i, paciente_data in enumerate(request.data):
+            try:
+                # Verificar si ya existe un paciente similar (evitar duplicados exactos)
+                existing = Paciente.objects.filter(
+                    rut=paciente_data.get('rut'),
+                    email=paciente_data.get('email')
+                ).first()
+                
+                if existing:
+                    # Si existe, actualizar los datos
+                    serializer = PacienteSerializer(existing, data=paciente_data, partial=True)
+                    if serializer.is_valid():
+                        serializer.save()
+                        created_pacientes.append({
+                            'index': i,
+                            'action': 'updated',
+                            'paciente': serializer.data
+                        })
+                    else:
+                        errors.append({
+                            'index': i,
+                            'errors': serializer.errors,
+                            'data': paciente_data
+                        })
+                else:
+                    # Si no existe, crear nuevo
+                    serializer = PacienteSerializer(data=paciente_data)
+                    if serializer.is_valid():
+                        serializer.save()
+                        created_pacientes.append({
+                            'index': i,
+                            'action': 'created',
+                            'paciente': serializer.data
+                        })
+                    else:
+                        errors.append({
+                            'index': i,
+                            'errors': serializer.errors,
+                            'data': paciente_data
+                        })
+                        
+            except Exception as e:
+                errors.append({
+                    'index': i,
+                    'error': str(e),
+                    'data': paciente_data
+                })
+    
+    return Response({
+        'success_count': len(created_pacientes),
+        'error_count': len(errors),
+        'created_pacientes': created_pacientes,
+        'errors': errors
+    }, status=status.HTTP_200_OK if not errors else status.HTTP_207_MULTI_STATUS)
+
+
+@api_view(['GET'])
+def system_status(request):
+    """
+    Endpoint para verificar el estado del sistema y contadores
+    """
+    from .models import Region, Servicio, Dentista, Paciente, SlotAgenda, Reserva
+    
+    return Response({
+        'status': 'active',
+        'timestamp': timezone.now(),
+        'counts': {
+            'regiones': Region.objects.count(),
+            'servicios': Servicio.objects.count(),
+            'dentistas': Dentista.objects.count(),
+            'pacientes': Paciente.objects.count(),
+            'slots_agenda': SlotAgenda.objects.count(),
+            'reservas': Reserva.objects.count()
+        },
+        'data_sources': {
+            'allow_duplicate_rut': True,
+            'bulk_endpoints_available': True,
+            'external_integration_ready': True
+        }
+    })

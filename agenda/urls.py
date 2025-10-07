@@ -1,6 +1,6 @@
 from django.urls import path, include
 from .views import SlotsDisponiblesList, CrearReserva, generar_slots
-from .views import slots_por_fecha
+from .views import slots_por_fecha, bulk_create_pacientes, system_status
 from rest_framework.routers import DefaultRouter
 from .viewsets import DentistaViewSet, ServicioViewSet, PacienteViewSet, RegionViewSet, ReservaViewSet
 
@@ -16,5 +16,7 @@ urlpatterns = [
     path('reservas/', CrearReserva.as_view(), name='crear-reserva'),
     path('dentistas/<int:dentista_id>/generar_slots/', generar_slots, name='generar-slots'),
     path('slots_por_fecha/', slots_por_fecha, name='slots-por-fecha'),
+    path('bulk/pacientes/', bulk_create_pacientes, name='bulk-create-pacientes'),
+    path('status/', system_status, name='system-status'),
     path('api/', include(router.urls)),
 ]

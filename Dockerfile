@@ -17,7 +17,7 @@ COPY . /app
 # Crear directorios para archivos estáticos y media
 RUN mkdir -p /app/static /app/media
 
-# Ejecutar migraciones
+# Ejecutar migraciones y collectstatic
 RUN python manage.py makemigrations || true
 RUN python manage.py migrate || true
 RUN python manage.py collectstatic --noinput || true
