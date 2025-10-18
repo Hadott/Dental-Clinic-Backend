@@ -1,6 +1,8 @@
 from rest_framework import serializers
+from django.contrib.auth.models import User
+from django.contrib.auth import authenticate
 from django.db import IntegrityError
-from .models import SlotAgenda, Reserva, Servicio, Dentista, Paciente, Region
+from .models import SlotAgenda, Reserva, Servicio, Dentista, Paciente, Region, Vacacion, HorarioTrabajo
 
 
 class SlotAgendaSerializer(serializers.ModelSerializer):
@@ -183,3 +185,133 @@ class ReservaReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reserva
         fields = ('id', 'slot', 'paciente', 'servicio', 'creado_en', 'sobrecupo')
+
+
+# ===== NUEVOS SERIALIZERS PARA AUTENTICACIÓN Y PANEL DENTISTA =====
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'first_name', 'last_name')
+
+
+class DentistaDetailSerializer(serializers.ModelSerializer):
+    """Serializer detallado para dentistas con información de usuario"""
+    user = UserSerializer(read_only=True)
+    region = RegionSerializer(read_only=True)
+    servicios = ServicioSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Dentista
+        fields = ('id', 'user', 'nombre', 'apellido', 'especialidad', 'email', 
+                 'telefono', 'region', 'servicios', 'activo', 'max_overbook_day')
+
+
+class VacacionSerializer(serializers.ModelSerializer):
+    """Serializer para vacaciones"""
+    dentista_nombre = serializers.CharField(source='dentista.nombre', read_only=True)
+    
+    class Meta:
+        model = Vacacion
+        fields = ('id', 'dentista', 'dentista_nombre', 'fecha_inicio', 'fecha_fin', 
+                 'motivo', 'aprobada', 'activa', 'creado_en')
+        read_only_fields = ('creado_en', 'dentista')  # dentista se asigna automáticamente
+
+    def validate(self, data):
+        if data['fecha_inicio'] > data['fecha_fin']:
+            raise serializers.ValidationError(
+                "La fecha de inicio no puede ser posterior a la fecha de fin."
+            )
+        return data
+
+
+class HorarioTrabajoSerializer(serializers.ModelSerializer):
+    """Serializer para horarios de trabajo"""
+    dia_semana_display = serializers.CharField(source='get_dia_semana_display', read_only=True)
+    
+    class Meta:
+        model = HorarioTrabajo
+        fields = ('id', 'dentista', 'dia_semana', 'dia_semana_display', 
+                 'hora_inicio', 'hora_fin', 'activo')
+        read_only_fields = ('dentista',)  # dentista se asigna automáticamente
+
+    def validate(self, data):
+        if data['hora_inicio'] >= data['hora_fin']:
+            raise serializers.ValidationError(
+                "La hora de inicio debe ser anterior a la hora de fin."
+            )
+        return data
+
+
+class SlotAgendaCreateSerializer(serializers.ModelSerializer):
+    """Serializer para crear slots de agenda desde el panel del dentista"""
+    
+    class Meta:
+        model = SlotAgenda
+        fields = ('id', 'dentista', 'servicio', 'fecha', 'hora', 'capacidad', 'max_overbook')
+        read_only_fields = ('dentista',)  # El dentista se asigna automáticamente
+
+    def create(self, validated_data):
+        # Asignar automáticamente el dentista del usuario autenticado
+        request = self.context.get('request')
+        if request and hasattr(request.user, 'dentista'):
+            validated_data['dentista'] = request.user.dentista
+        return super().create(validated_data)
+
+
+class AgendaDentistaSerializer(serializers.ModelSerializer):
+    """Serializer para mostrar la agenda del dentista con reservas"""
+    reservas = ReservaReadSerializer(many=True, read_only=True)
+    servicio = ServicioSerializer(read_only=True)
+    reservas_count = serializers.SerializerMethodField()
+    disponible = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SlotAgenda
+        fields = ('id', 'servicio', 'fecha', 'hora', 'capacidad', 'max_overbook', 
+                 'reservas', 'reservas_count', 'disponible')
+    
+    def get_reservas_count(self, obj):
+        return obj.reservas.count()
+    
+    def get_disponible(self, obj):
+        return obj.reservas.count() < obj.capacidad
+
+
+class LoginSerializer(serializers.Serializer):
+    """Serializer para login de dentistas"""
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        username = data.get('username')
+        password = data.get('password')
+
+        if username and password:
+            user = authenticate(username=username, password=password)
+            if user:
+                if not user.is_active:
+                    raise serializers.ValidationError("Usuario desactivado.")
+                
+                # Verificar que el usuario tenga un perfil de dentista
+                if not hasattr(user, 'dentista'):
+                    raise serializers.ValidationError("Usuario no autorizado como dentista.")
+                
+                if not user.dentista.activo:
+                    raise serializers.ValidationError("Dentista desactivado.")
+                
+                data['user'] = user
+                return data
+            else:
+                raise serializers.ValidationError("Credenciales incorrectas.")
+        else:
+            raise serializers.ValidationError("Debe proporcionar username y password.")
+
+
+class EstadisticasDentistaSerializer(serializers.Serializer):
+    """Serializer para estadísticas del panel del dentista"""
+    citas_hoy = serializers.IntegerField()
+    citas_semana = serializers.IntegerField()
+    citas_mes = serializers.IntegerField()
+    proximas_citas = AgendaDentistaSerializer(many=True)
+    pacientes_atendidos_mes = serializers.IntegerField()

@@ -7,9 +7,9 @@ WORKDIR /app
 # Copia el archivo requirements.txt primero (para optimizar el cache de Docker)
 COPY requirements.txt .
 
-# Instala las dependencias principales
+# Instala las dependencias desde requirements.txt
 RUN pip install --upgrade pip
-RUN pip install Django==4.2.25 djangorestframework==3.14.0 django-cors-headers==4.3.1
+RUN pip install -r requirements.txt
 
 # Copia los archivos del proyecto al contenedor
 COPY . /app

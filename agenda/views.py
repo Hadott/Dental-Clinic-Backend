@@ -1,7 +1,7 @@
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework import status
-from .models import SlotAgenda, Reserva, Dentista
+from .models import SlotAgenda, Reserva, Dentista, Servicio, Region
 from .serializers import SlotAgendaSerializer, ReservaCreateSerializer
 from django.utils import timezone
 from rest_framework.decorators import api_view
@@ -96,4 +96,85 @@ def slots_por_fecha(request):
     if dentista_id:
         qs = qs.filter(dentista_id=dentista_id)
     serializer = SlotAgendaSerializer(qs.order_by('hora'), many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+def dentistas_por_servicio(request):
+    """
+    Filtrar dentistas que pueden realizar un servicio específico
+    Query params: servicio_id=1, region_id=2 (opcional)
+    """
+    servicio_id = request.GET.get('servicio_id')
+    region_id = request.GET.get('region_id')
+    
+    if not servicio_id:
+        return Response({'detail': 'Se requiere servicio_id'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        servicio = Servicio.objects.get(id=servicio_id)
+    except Servicio.DoesNotExist:
+        return Response({'detail': 'Servicio no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Filtrar dentistas que pueden realizar este servicio
+    dentistas = Dentista.objects.filter(servicios=servicio)
+    
+    # Filtrar por región si se proporciona
+    if region_id:
+        try:
+            region = Region.objects.get(id=region_id)
+            dentistas = dentistas.filter(region=region)
+        except Region.DoesNotExist:
+            return Response({'detail': 'Región no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Serializar la respuesta
+    dentistas_data = []
+    for dentista in dentistas:
+        dentistas_data.append({
+            'id': dentista.id,
+            'nombre': dentista.nombre,
+            'apellido': dentista.apellido,
+            'especialidad': dentista.especialidad,
+            'email': dentista.email,
+            'telefono': dentista.telefono,
+            'region': {
+                'id': dentista.region.id,
+                'nombre': dentista.region.nombre,
+                'codigo': dentista.region.codigo
+            } if dentista.region else None
+        })
+    
+    return Response(dentistas_data)
+
+
+@api_view(['GET'])
+def slots_por_dentista_y_fecha(request):
+    """
+    Obtener slots disponibles para un dentista específico en una fecha
+    Query params: dentista_id=1, fecha=YYYY-MM-DD
+    """
+    dentista_id = request.GET.get('dentista_id')
+    fecha = request.GET.get('fecha')
+    
+    if not dentista_id or not fecha:
+        return Response({'detail': 'Se requieren dentista_id y fecha'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        dentista = Dentista.objects.get(id=dentista_id)
+    except Dentista.DoesNotExist:
+        return Response({'detail': 'Dentista no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    
+    import datetime
+    try:
+        fecha_obj = datetime.datetime.strptime(fecha, '%Y-%m-%d').date()
+    except Exception:
+        return Response({'detail': 'Formato de fecha inválido. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Obtener slots del dentista en la fecha específica
+    slots = SlotAgenda.objects.filter(
+        dentista=dentista,
+        fecha=fecha_obj
+    ).order_by('hora')
+    
+    serializer = SlotAgendaSerializer(slots, many=True)
     return Response(serializer.data)

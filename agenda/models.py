@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 
 class Region(models.Model):
@@ -31,7 +32,7 @@ class Paciente(models.Model):
 
 
 class Dentista(models.Model):
-   
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True, related_name='dentista')
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     especialidad = models.CharField(max_length=100, blank=True)
@@ -39,6 +40,8 @@ class Dentista(models.Model):
     telefono = models.CharField(max_length=20, blank=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='dentistas', null=True, blank=True)
     max_overbook_day = models.PositiveIntegerField(default=0, help_text='Máximo de sobrecupos permitidos por día para este dentista')
+    servicios = models.ManyToManyField('Servicio', blank=True, related_name='dentistas', help_text='Servicios que puede realizar este dentista')
+    activo = models.BooleanField(default=True)
 
     class Meta:
         ordering = ['apellido', 'nombre']
@@ -116,3 +119,51 @@ class Reserva(models.Model):
 
     def __str__(self):
         return f"Reserva {self.paciente} -> {self.slot} {'(Sobrecupo)' if self.sobrecupo else ''}"
+
+
+class Vacacion(models.Model):
+    """Períodos de vacaciones de los dentistas"""
+    dentista = models.ForeignKey(Dentista, on_delete=models.CASCADE, related_name='vacaciones')
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    motivo = models.CharField(max_length=200, blank=True, help_text='Motivo de la ausencia (vacaciones, capacitación, etc.)')
+    aprobada = models.BooleanField(default=True)
+    activa = models.BooleanField(default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha_inicio']
+
+    def __str__(self):
+        return f"{self.dentista} - {self.fecha_inicio} a {self.fecha_fin}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.fecha_inicio > self.fecha_fin:
+            raise ValidationError('La fecha de inicio no puede ser posterior a la fecha de fin.')
+
+
+class HorarioTrabajo(models.Model):
+    """Horarios de trabajo regulares de los dentistas"""
+    DIAS_SEMANA = [
+        (0, 'Lunes'),
+        (1, 'Martes'),
+        (2, 'Miércoles'),
+        (3, 'Jueves'),
+        (4, 'Viernes'),
+        (5, 'Sábado'),
+        (6, 'Domingo'),
+    ]
+    
+    dentista = models.ForeignKey(Dentista, on_delete=models.CASCADE, related_name='horarios')
+    dia_semana = models.IntegerField(choices=DIAS_SEMANA)
+    hora_inicio = models.TimeField()
+    hora_fin = models.TimeField()
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('dentista', 'dia_semana')
+        ordering = ['dia_semana', 'hora_inicio']
+
+    def __str__(self):
+        return f"{self.dentista} - {self.get_dia_semana_display()}: {self.hora_inicio}-{self.hora_fin}"
